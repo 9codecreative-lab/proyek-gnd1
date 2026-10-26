@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>PT. Glory Nine Degrees - HR Monitoring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 0;}
+            .no-print { display: none !important; }
+        }
+        video { transform: scaleX(-1); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased h-screen flex flex-col overflow-hidden relative">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 right-5 z-[100] transform transition-all duration-300 translate-y-[-150%] opacity-0 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-slate-700 pointer-events-none">
+        <i id="toast-icon" class="fas fa-check-circle text-emerald-400 text-lg"></i>
+        <span id="toast-message" class="text-sm font-medium">Notifikasi</span>
+    </div>
+
+    <!-- Confirm Dialog -->
+    <div id="confirm-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[90] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col p-6 text-center">
+            <i class="fas fa-exclamation-triangle text-4xl text-rose-500 mb-4"></i>
+            <h3 class="font-bold text-lg text-slate-800 mb-2" id="confirm-title">Konfirmasi</h3>
+            <p class="text-sm text-slate-500 mb-6" id="confirm-message">Apakah Anda yakin?</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="window.closeConfirm()" class="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition">Batal</button>
+                <button id="btn-confirm-action" class="px-4 py-2 text-sm font-bold text-white bg-rose-500 hover:bg-rose-600 rounded-lg transition">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal (Management) -->
+    <div id="edit-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[60] hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div class="bg-amber-500 text-white px-5 py-3 flex justify-between items-center">
+                <h3 class="font-bold"><i class="fas fa-edit mr-2"></i>Edit Data Tugas</h3>
+                <button onclick="window.closeEditModal()" class="text-white hover:text-amber-100"><i class="fas fa-times text-lg"></i></button>
+            </div>
+            <form id="form-edit" onsubmit="window.saveEdit(event)" class="p-5 space-y-4 overflow-y-auto max-h-[80vh]">
+                <input type="hidden" id="edit-id">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Project</label>
+                    <input type="text" id="edit-project" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Pekerjaan</label>
+                    <input type="text" id="edit-task" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Jumlah</label>
+                        <input type="number" id="edit-qty" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                        <select id="edit-status" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none bg-white">
+                            <option value="Selesai">Selesai</option>
+                            <option value="Sedang Dikerjakan">Sedang Dikerjakan</option>
+                            <option value="Tertunda">Tertunda</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Tipe Jam</label>
+                        <select id="edit-type" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none bg-white">
+                            <option value="Reguler">Reguler</option>
+                            <option value="Lembur">Lembur</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Status Approval</label>
+                        <select id="edit-approval" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-amber-500 focus:outline-none bg-white">
+                            <option value="N/A">N/A (Reguler)</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Disetujui">Disetujui</option>
+                            <option value="Ditolak">Ditolak</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end gap-3 border-t border-slate-100 mt-2">
+                    <button type="button" onclick="window.closeEditModal()" class="px-4 py-2 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition">Batal</button>
+                    <button type="submit" id="btn-save-edit" class="px-4 py-2 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-lg transition">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ================= VIEWS ================= -->
+    
+    <!-- 1. LANDING PAGE -->
+    <div id="view-landing" class="flex flex-1 flex-col items-center justify-center p-4 h-full overflow-y-auto">
+        <div class="text-center mb-8 mt-4">
+            <div class="relative group cursor-pointer inline-block mb-4" onclick="document.getElementById('logo-upload').click()" title="Klik untuk mengganti logo">
+                <img src="" class="company-logo h-20 w-auto object-contain rounded-xl shadow-md mx-auto bg-white border p-2" alt="Logo">
+                <div class="absolute inset-0 bg-black/60 hidden group-hover:flex items-center justify-center rounded-xl text-white text-xs font-bold transition-all">
+                    <i class="fas fa-camera mr-1"></i> Ganti Logo
+                </div>
+                <input type="file" id="logo-upload" accept="image/*" class="hidden" onchange="window.handleLogoUpload(event)">
+            </div>
+            
+            <h1 class="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">PT. Glory Nine Degrees</h1>
+            <p class="text-slate-500 text-sm mt-1">Sistem HR & Monitoring Cloud</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl w-full">
+            <div onclick="window.showView('view-karyawan-login')" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:border-blue-400 hover:shadow-md transition group text-center">
+                <i class="fas fa-users text-4xl text-blue-500 mb-4 block group-hover:scale-110 transition-transform"></i>
+                <h2 class="text-xl font-bold text-slate-800">Karyawan</h2>
+                <p class="text-slate-500 text-xs mt-1">Absensi & Input Pekerjaan</p>
+            </div>
+            <div onclick="window.showView('view-management-login')" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:border-amber-400 hover:shadow-md transition group text-center">
+                <i class="fas fa-user-tie text-4xl text-amber-500 mb-4 block group-hover:scale-110 transition-transform"></i>
+                <h2 class="text-xl font-bold text-slate-800">Management</h2>
+                <p class="text-slate-500 text-xs mt-1">Dashboard & Rekap Data</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. LOGIN KARYAWAN -->
+    <div id="view-karyawan-login" class="hidden flex-1 flex-col items-center justify-center p-4 h-full">
+        <div class="bg-white p-6 rounded-2xl shadow-sm max-w-sm w-full border border-slate-200 relative">
+            <button onclick="window.showView('view-landing')" class="absolute top-4 left-4 text-slate-400 hover:text-slate-700 transition"><i class="fas fa-arrow-left"></i></button>
+            <div class="text-center mb-6 mt-4">
+                <h2 class="text-xl font-bold text-slate-800">Portal Karyawan</h2>
+                <p class="text-xs text-slate-500 mt-1">Ketik nama lengkap Anda untuk masuk</p>
+            </div>
+            <form onsubmit="window.handleKaryawanLogin(event)" class="space-y-4">
+                <input type="text" id="input-karyawan-name" required placeholder="Contoh: Budi Santoso" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 text-slate-800 font-medium">
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-md transition">Masuk</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 3. LOGIN MANAGEMENT -->
+    <div id="view-management-login" class="hidden flex-1 flex-col items-center justify-center p-4 h-full">
+        <div class="bg-white p-6 rounded-2xl shadow-sm max-w-sm w-full border border-slate-200 relative">
+            <button onclick="window.showView('view-landing')" class="absolute top-4 left-4 text-slate-400 hover:text-slate-700 transition"><i class="fas fa-arrow-left"></i></button>
+            <div class="text-center mb-6 mt-4">
+                <h2 class="text-xl font-bold text-slate-800">Portal Management</h2>
+                <p class="text-xs text-slate-500 mt-1">Masukkan PIN Otorisasi</p>
+            </div>
+            <form onsubmit="window.handleManagementLogin(event)" class="space-y-4">
+                <input type="password" id="input-management-pin" required placeholder="PIN" class="w-full text-center tracking-[0.5em] text-2xl border-2 border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:border-amber-500 font-bold text-slate-800">
+                <button type="submit" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-md transition">Verifikasi</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 4. PORTAL KARYAWAN -->
+    <div id="view-karyawan-portal" class="hidden flex-1 flex-col h-full bg-slate-50">
+        <header class="bg-blue-600 text-white flex items-center justify-between px-4 py-3 shadow-md z-10">
+            <div class="flex items-center gap-3">
+                <button onclick="window.logout()" class="p-2 hover:bg-blue-700 rounded transition" title="Keluar"><i class="fas fa-sign-out-alt"></i></button>
+                <div class="font-bold text-sm" id="display-k-name">Nama Karyawan</div>
+            </div>
+            <div class="flex bg-blue-700 rounded-lg p-1 text-xs shadow-inner">
+                <button onclick="window.switchKaryawanTab('absen')" id="ktab-btn-absen" class="px-3 py-1.5 rounded-md bg-white text-blue-700 font-bold shadow-sm transition">Absen</button>
+                <button onclick="window.switchKaryawanTab('tugas')" id="ktab-btn-tugas" class="px-3 py-1.5 rounded-md text-blue-100 hover:text-white transition">Tugas (Multi)</button>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+            <!-- Tab Absen -->
+            <div id="ktab-content-absen" class="block max-w-md mx-auto text-center mt-4">
+                <h2 class="font-bold text-xl mb-1 text-slate-800">Absensi Kehadiran</h2>
+                <p class="text-sm text-slate-500 mb-6">Silakan absen untuk hari ini.</p>
+                
+                <div id="camera-container" class="relative bg-white rounded-2xl overflow-hidden aspect-[3/4] mb-6 flex items-center justify-center border-2 border-dashed border-slate-300 shadow-sm">
+                    <video id="camera-stream" autoplay playsinline class="absolute inset-0 w-full h-full object-cover hidden"></video>
+                    <img id="preview-photo" class="absolute inset-0 w-full h-full object-cover hidden" />
+                    
+                    <div id="camera-placeholder" class="text-slate-400 flex flex-col items-center p-6 text-center">
+                        <i class="fas fa-camera text-5xl mb-3 text-slate-300"></i>
+                        <span class="text-sm font-medium">Kamera belum aktif</span>
+                    </div>
+                </div>
+                
+                <canvas id="camera-canvas" class="hidden"></canvas>
+                
+                <div class="space-y-3 px-4">
+                    <button id="btn-start-camera" onclick="window.startCamera()" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3.5 rounded-xl shadow-lg transition"><i class="fas fa-video mr-2"></i>Nyalakan Kamera</button>
+                    
+                    <button id="btn-take-photo" onclick="window.takeSnapshot()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg transition hidden"><i class="fas fa-camera mr-2"></i>Ambil Foto & Absen</button>
+                    
+                    <button id="btn-fallback-absen" onclick="window.absenTanpaFoto()" class="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3.5 rounded-xl shadow-lg transition hidden"><i class="fas fa-user-check mr-2"></i>Absen Tanpa Foto</button>
+                    
+                    <button id="btn-retake" onclick="window.retakePhoto()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3.5 rounded-xl transition hidden"><i class="fas fa-redo mr-2"></i>Ulangi</button>
+                </div>
+            </div>
+
+            <!-- Tab Tugas (Multi Item) -->
+            <div id="ktab-content-tugas" class="hidden max-w-2xl mx-auto mt-2">
+                <div class="bg-white rounded-2xl border border-slate-200 p-4 md:p-6 shadow-sm">
+                    <h2 class="font-bold text-lg mb-4 border-b border-slate-100 pb-3 flex justify-between items-center">
+                        <span><i class="fas fa-tasks text-blue-500 mr-2"></i>Input Aktivitas Pekerjaan</span>
+                    </h2>
+                    
+                    <form id="form-task" onsubmit="window.submitMultiTask(event)" class="space-y-6">
+                        
+                        <!-- General Info (Time & Type & Project) -->
+                        <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                            <h3 class="text-sm font-bold text-slate-700">Informasi Dasar</h3>
+                            
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Project</label>
+                                <input type="text" id="k-project" required placeholder="Contoh: Project Website / Produksi A" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500">
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Jam Mulai</label>
+                                    <input type="time" id="k-start" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Jam Selesai</label>
+                                    <input type="time" id="k-end" required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-700 mb-1">Tipe Jam Kerja</label>
+                                <select id="k-type" onchange="window.toggleLembur()" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-500 font-medium text-blue-700 bg-white">
+                                    <option value="Reguler">Jam Kerja Reguler</option>
+                                    <option value="Lembur">Lembur (Overtime)</option>
+                                </select>
+                            </div>
+                            <div id="k-lembur-fields" class="hidden space-y-3 pt-2">
+                                <input type="text" id="k-spk" placeholder="Nomor SPK Lembur" class="w-full border border-amber-300 bg-amber-50 rounded-lg text-sm p-2 outline-none focus:border-amber-500">
+                                <input type="text" id="k-reason" placeholder="Alasan Lembur" class="w-full border border-amber-300 bg-amber-50 rounded-lg text-sm p-2 outline-none focus:border-amber-500">
+                            </div>
+                        </div>
+
+                        <!-- Dynamic Task Items -->
+                        <div>
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-sm font-bold text-slate-700">Daftar Item Pekerjaan</h3>
+                                <button type="button" onclick="window.addTaskRow()" class="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200 transition">
+                                    <i class="fas fa-plus mr-1"></i> Tambah Item
+                                </button>
+                            </div>
+                            <div id="task-items-container" class="space-y-3">
+                                <!-- Default 1 Row -->
+                                <div class="task-row flex flex-col md:flex-row gap-3 bg-white p-3 rounded-lg border border-slate-200 relative group">
+                                    <div class="flex-1">
+                                        <input type="text" required placeholder="Nama Pekerjaan (Misal: Perakitan part X)" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none task-name">
+                                    </div>
+                                    <div class="w-full md:w-24">
+                                        <input type="number" required min="1" placeholder="Qty" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none task-qty">
+                                    </div>
+                                    <div class="w-full md:w-40">
+                                        <select required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none bg-white task-status">
+                                            <option value="Selesai">Selesai</option>
+                                            <option value="Sedang Dikerjakan">Dikerjakan</option>
+                                            <option value="Tertunda">Tertunda</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-4 border-t border-slate-100">
+                            <button type="submit" id="btn-submit-task" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-md transition disabled:opacity-50">Simpan Semua Pekerjaan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 5. PORTAL MANAGEMENT -->
+    <div id="view-management-portal" class="hidden flex-1 flex-col h-full bg-slate-100">
+        <header class="bg-slate-900 text-white flex items-center justify-between px-4 py-3 shadow-md z-10 no-print">
+            <div class="flex items-center gap-3 font-bold text-sm">
+                <img src="" class="company-logo h-8 w-auto object-contain bg-white rounded p-0.5" alt="Logo">
+                <span><i class="fas fa-crown text-amber-500 mr-2"></i>Management</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div id="cloud-indicator" class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Cloud Sync Active"></div>
+                <button onclick="window.logout()" class="text-xs bg-slate-800 hover:bg-slate-700 transition px-3 py-1.5 rounded-lg border border-slate-700"><i class="fas fa-sign-out-alt mr-1"></i> Keluar</button>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="flex bg-white border-b border-slate-200 overflow-x-auto no-print custom-scrollbar flex-shrink-0 shadow-sm">
+            <button onclick="window.switchTab('dash')" id="mtab-btn-dash" class="px-5 py-3.5 text-sm font-bold border-b-2 border-amber-500 text-amber-600 whitespace-nowrap transition">Dashboard</button>
+            <button onclick="window.switchTab('absen')" id="mtab-btn-absen" class="px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap transition">Rekap Absen Harian</button>
+            <button onclick="window.switchTab('approval')" id="mtab-btn-approval" class="px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap transition">Persetujuan Lembur</button>
+            <button onclick="window.switchTab('all')" id="mtab-btn-all" class="px-5 py-3.5 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-800 whitespace-nowrap transition">Semua Tugas</button>
+        </div>
+
+        <main class="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar" id="print-area">
+            
+            <!-- Tab Dashboard -->
+            <div id="tab-content-dash" class="block space-y-5 max-w-5xl mx-auto">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Entri Tugas</p>
+                        <h3 id="stat-total" class="text-3xl font-black text-slate-800">0</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold text-blue-500 uppercase tracking-wider mb-1">Total Absensi</p>
+                        <h3 id="stat-absen" class="text-3xl font-black text-blue-600">0</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold text-emerald-500 uppercase tracking-wider mb-1">Tugas Selesai</p>
+                        <h3 id="stat-selesai" class="text-3xl font-black text-emerald-600">0</h3>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <p class="text-xs font-bold text-amber-500 uppercase tracking-wider mb-1">Entri Lembur</p>
+                        <h3 id="stat-lembur" class="text-3xl font-black text-amber-600">0</h3>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 class="text-sm font-bold text-slate-700 mb-4 border-b pb-2">Status Pekerjaan</h3>
+                        <div class="relative h-56 w-full"><canvas id="chart-status"></canvas></div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                        <h3 class="text-sm font-bold text-slate-700 mb-4 border-b pb-2">Reguler vs Lembur</h3>
+                        <div class="relative h-56 w-full"><canvas id="chart-type"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Rekap Absen Harian -->
+            <div id="tab-content-absen" class="hidden max-w-6xl mx-auto">
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden p-4 md:p-6 mb-4 no-print flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800">Rekap Absensi Harian</h2>
+                        <p class="text-xs text-slate-500">Pilih tanggal untuk melihat daftar karyawan yang hadir.</p>
+                    </div>
+                    <div class="flex items-center gap-3 w-full md:w-auto">
+                        <input type="date" id="filter-date-absen" onchange="window.renderAbsenHarian()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500">
+                        <button onclick="window.exportCSV('absen')" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition flex-shrink-0"><i class="fas fa-download mr-1"></i>Unduh CSV</button>
+                        <button onclick="window.print()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-slate-700 transition flex-shrink-0"><i class="fas fa-print mr-1"></i>Cetak</button>
+                    </div>
+                </div>
+                
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-blue-50 text-blue-900 border-b border-blue-100">
+                                <tr>
+                                    <th class="p-4 font-bold w-16">No</th>
+                                    <th class="p-4 font-bold">Nama Karyawan</th>
+                                    <th class="p-4 font-bold">Jam Absen</th>
+                                    <th class="p-4 font-bold">Status/Foto</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-absen-harian" class="divide-y divide-slate-100">
+                                <!-- injected -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Approval -->
+            <div id="tab-content-approval" class="hidden max-w-6xl mx-auto">
+                <h2 class="text-xl font-bold text-slate-800 mb-4">Antrean Persetujuan Lembur</h2>
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-amber-100 text-amber-900 border-b border-amber-200">
+                                <tr>
+                                    <th class="p-4 font-bold">Karyawan & Waktu</th>
+                                    <th class="p-4 font-bold">Project & Pekerjaan</th>
+                                    <th class="p-4 font-bold">SPK & Alasan</th>
+                                    <th class="p-4 font-bold text-center">Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-approval" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Semua Tugas (Edit) -->
+            <div id="tab-content-all" class="hidden max-w-6xl mx-auto">
+                <div class="flex flex-col md:flex-row items-center justify-between mb-4 gap-3 no-print">
+                    <h2 class="text-xl font-bold text-slate-800">Semua Data Pekerjaan & Aktivitas</h2>
+                    <div class="flex gap-2">
+                        <button onclick="window.exportCSV('tasks')" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition"><i class="fas fa-download mr-1"></i>Unduh Data (CSV)</button>
+                        <button onclick="window.print()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition"><i class="fas fa-print mr-1"></i>Cetak Laporan</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-slate-100 text-slate-700">
+                                <tr>
+                                    <th class="p-4 font-bold">Tanggal</th>
+                                    <th class="p-4 font-bold">Karyawan</th>
+                                    <th class="p-4 font-bold">Project, Tugas & Qty</th>
+                                    <th class="p-4 font-bold">Jam & Tipe</th>
+                                    <th class="p-4 font-bold text-center no-print">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-all" class="divide-y divide-slate-100 text-slate-600"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="hidden mt-10 text-center text-sm text-slate-500" style="display: none;" id="print-footer">
+                <p>Laporan dihasilkan oleh Sistem HR PT Glory Nine Degrees.</p>
+                <p>Dicetak pada: <span id="print-date"></span></p>
+            </div>
+            
+        </main>
+    </div>
+
+    <!-- ================= FIREBASE & JAVASCRIPT LOGIC ================= -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Firebase Config Setup
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'g9-hr-app';
+        let firebaseConfig = null;
+        try {
+            firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        } catch(e) { console.warn("No valid firebase config found"); }
+
+        // Local Storage Keys for Logo (As requested)
+        const DB_KEY_LOGO = 'g9_logo';
+        const DEFAULT_LOGO = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iNDAiPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iNDAiIGZpbGw9IiMyNTYzZWIiIHJ4PSI1Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZpbGw9IiNmZmYiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZvbnQtZmFtaWx5PSJzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iYm9sZCI+R0xPUlkgOTwvdGV4dD48L3N2Zz4=';
+        
+        // State
+        window.tasks = [];
+        window.attendances = [];
+        window.currentUser = null; 
+        window.currentRole = null; 
+        window.activeTab = 'dash';
+        
+        let statusChart = null;
+        let typeChart = null;
+        let stream = null;
+        let capturedPhotoData = null;
+        let db, auth, app;
+
+        // Initialize App & Auth
+        async function initSystem() {
+            if(firebaseConfig) {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                
+                try {
+                    if (typeof __initial_auth_token !== 'undefined') {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                    startCloudSync();
+                } catch(e) {
+                    console.error("Auth error:", e);
+                    window.showToast("Gagal terhubung ke Cloud Database.", true);
+                }
+            } else {
+                window.showToast("Menjalankan mode lokal (Tidak ada konfigurasi Cloud).", true);
+            }
+            
+            window.loadLogo();
+            
+            // Set today's date in attendance filter
+            document.getElementById('filter-date-absen').value = new Date().toISOString().split('T')[0];
+            document.getElementById('print-date').innerText = new Date().toLocaleDateString('id-ID', {weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'});
+        }
+
+        function getColPath(name) {
+            return collection(db, 'artifacts', appId, 'public', 'data', name);
+        }
+
+        function startCloudSync() {
+            // Sync Tasks
+            onSnapshot(getColPath('g9_tasks'), (snapshot) => {
+                window.tasks = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                if(window.currentRole === 'management') window.updateManagementUI();
+            }, (error) => {
+                console.error("Sync error tasks:", error);
+            });
+
+            // Sync Attendance
+            onSnapshot(getColPath('g9_attendance'), (snapshot) => {
+                window.attendances = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                if(window.currentRole === 'management') window.updateManagementUI();
+            }, (error) => {
+                console.error("Sync error absen:", error);
+            });
+        }
+
+        // --- Logo Local Storage ---
+        window.handleLogoUpload = (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    localStorage.setItem(DB_KEY_LOGO, ev.target.result);
+                    window.loadLogo();
+                    window.showToast("Logo berhasil diperbarui!");
+                } catch(err) {
+                    window.showToast("Gambar terlalu besar.", true);
+                }
+            };
+            reader.readAsDataURL(file);
+        };
+
+        window.loadLogo = () => {
+            const savedLogo = localStorage.getItem(DB_KEY_LOGO);
+            document.querySelectorAll('.company-logo').forEach(img => img.src = savedLogo || DEFAULT_LOGO);
+        };
+
+        // --- Core UI functions ---
+        window.showToast = (msg, isErr=false) => {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-message').innerText = msg;
+            document.getElementById('toast-icon').className = `fas ${isErr ? 'fa-times-circle text-rose-400' : 'fa-check-circle text-emerald-400'} text-lg`;
+            t.classList.replace('translate-y-[-150%]', 'translate-y-0');
+            t.classList.replace('opacity-100', 'opacity-0'); // reset
+            setTimeout(() => {
+                t.classList.replace('opacity-0', 'opacity-100');
+                t.classList.replace('translate-y-0', 'translate-y-[-150%]'); // cleanup class flow
+                
+                t.classList.remove('translate-y-[-150%]', 'opacity-0');
+                t.classList.add('translate-y-0', 'opacity-100');
+            }, 10);
+            
+            setTimeout(() => {
+                t.classList.remove('translate-y-0', 'opacity-100');
+                t.classList.add('translate-y-[-150%]', 'opacity-0');
+            }, 3000);
+        };
+
+        // Custom Confirm
+        let confirmActionCallback = null;
+        window.openConfirm = (title, message, callback) => {
+            document.getElementById('confirm-title').innerText = title;
+            document.getElementById('confirm-message').innerText = message;
+            confirmActionCallback = callback;
+            document.getElementById('confirm-modal').classList.replace('hidden', 'flex');
+        };
+        window.closeConfirm = () => {
+            document.getElementById('confirm-modal').classList.replace('flex', 'hidden');
+            confirmActionCallback = null;
+        };
+        document.getElementById('btn-confirm-action').addEventListener('click', () => {
+            if(confirmActionCallback) confirmActionCallback();
+            window.closeConfirm();
+        });
+
+
+        window.showView = (id) => {
+            ['view-landing','view-karyawan-login','view-management-login','view-karyawan-portal','view-management-portal'].forEach(v => {
+                document.getElementById(v).classList.add('hidden');
+                document.getElementById(v).classList.remove('flex');
+            });
+            const target = document.getElementById(id);
+            target.classList.remove('hidden');
+            target.classList.add('flex');
+        };
+
+        window.logout = () => {
+            if(stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+            window.currentUser = window.currentRole = null;
+            document.getElementById('input-karyawan-name').value = '';
+            document.getElementById('input-management-pin').value = '';
+            window.showView('view-landing');
+        };
+
+        // --- Camera & Fallback ---
+        window.startCamera = async () => {
+            document.getElementById('btn-start-camera').innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Mengakses...';
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+                const video = document.getElementById('camera-stream');
+                video.srcObject = stream;
+                video.classList.remove('hidden');
+                document.getElementById('camera-placeholder').classList.add('hidden');
+                
+                document.getElementById('btn-start-camera').classList.add('hidden');
+                document.getElementById('btn-take-photo').classList.remove('hidden');
+            } catch (err) {
+                window.showToast("Kamera gagal diakses. Mode Absen Tanpa Foto diaktifkan.", true);
+                document.getElementById('btn-start-camera').classList.add('hidden');
+                document.getElementById('btn-fallback-absen').classList.remove('hidden');
+                
+                const p = document.getElementById('camera-placeholder');
+                p.innerHTML = `<i class="fas fa-video-slash text-5xl mb-3 text-rose-300"></i><span class="text-sm font-medium text-rose-500">Kamera Diblokir/Gagal</span>`;
+            }
+        };
+
+        window.takeSnapshot = () => {
+            const video = document.getElementById('camera-stream');
+            const canvas = document.getElementById('camera-canvas');
+            if(!stream) return;
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            capturedPhotoData = canvas.toDataURL('image/jpeg', 0.5); 
+            
+            document.getElementById('preview-photo').src = capturedPhotoData;
+            document.getElementById('preview-photo').classList.remove('hidden');
+            video.classList.add('hidden');
+            
+            document.getElementById('btn-take-photo').classList.add('hidden');
+            
+            saveAttendanceToCloud(capturedPhotoData);
+        };
+
+        window.absenTanpaFoto = () => {
+            saveAttendanceToCloud("TANPA_FOTO");
+        };
+
+        async function saveAttendanceToCloud(photoData) {
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('en-CA'); 
+            const timeStr = now.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+            
+            const payload = {
+                name: window.currentUser,
+                photoUrl: photoData,
+                timestamp: Date.now(),
+                dateStr: dateStr,
+                timeStr: timeStr
+            };
+            
+            if(db) {
+                document.getElementById('btn-take-photo').disabled = true;
+                document.getElementById('btn-fallback-absen').disabled = true;
+                try {
+                    await addDoc(getColPath('g9_attendance'), payload);
+                    window.showToast("Absen berhasil disimpan ke Cloud!");
+                    document.getElementById('btn-retake').classList.remove('hidden');
+                } catch(e) {
+                    window.showToast("Gagal menyimpan ke Cloud.", true);
+                    console.error(e);
+                } finally {
+                    document.getElementById('btn-take-photo').disabled = false;
+                    document.getElementById('btn-fallback-absen').disabled = false;
+                    document.getElementById('btn-fallback-absen').classList.add('hidden');
+                }
+            }
+        }
+
+        window.retakePhoto = () => {
+            document.getElementById('preview-photo').classList.add('hidden');
+            document.getElementById('camera-stream').classList.remove('hidden');
+            document.getElementById('btn-retake').classList.add('hidden');
+            document.getElementById('btn-take-photo').classList.remove('hidden');
+            capturedPhotoData = null;
+        };
+
+        // --- Multi Task Logic ---
+        window.addTaskRow = () => {
+            const container = document.getElementById('task-items-container');
+            const rowHTML = `
+                <div class="task-row flex flex-col md:flex-row gap-3 bg-white p-3 rounded-lg border border-slate-200 relative group mt-2">
+                    <button type="button" onclick="this.parentElement.remove()" class="absolute -top-2 -right-2 bg-rose-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow hover:bg-rose-600 md:hidden group-hover:flex"><i class="fas fa-times"></i></button>
+                    <div class="flex-1">
+                        <input type="text" required placeholder="Nama Pekerjaan" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none task-name">
+                    </div>
+                    <div class="w-full md:w-24">
+                        <input type="number" required min="1" placeholder="Qty" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none task-qty">
+                    </div>
+                    <div class="w-full md:w-40">
+                        <select required class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:border-blue-500 outline-none bg-white task-status">
+                            <option value="Selesai">Selesai</option>
+                            <option value="Sedang Dikerjakan">Dikerjakan</option>
+                            <option value="Tertunda">Tertunda</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', rowHTML);
+        };
+
+        window.submitMultiTask = async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-submit-task');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Menyimpan...';
+
+            const projectName = document.getElementById('k-project').value;
+            const type = document.getElementById('k-type').value;
+            const startTime = document.getElementById('k-start').value;
+            const endTime = document.getElementById('k-end').value;
+            const spk = type === 'Lembur' ? document.getElementById('k-spk').value : '-';
+            const reason = type === 'Lembur' ? document.getElementById('k-reason').value : '-';
+            
+            const rows = document.querySelectorAll('.task-row');
+            
+            if(!db) {
+                window.showToast("Gagal menyimpan: Database Cloud tidak aktif.", true);
+                btn.disabled = false;
+                btn.innerHTML = 'Simpan Semua Pekerjaan';
+                return;
+            }
+
+            try {
+                for(let row of rows) {
+                    const taskName = row.querySelector('.task-name').value;
+                    const qty = row.querySelector('.task-qty').value;
+                    const status = row.querySelector('.task-status').value;
+
+                    await addDoc(getColPath('g9_tasks'), {
+                        name: window.currentUser,
+                        projectName: projectName,
+                        taskName: taskName,
+                        quantity: qty,
+                        taskStatus: status,
+                        date: new Date().toLocaleDateString('id-ID'),
+                        dateISO: new Date().toISOString().split('T')[0],
+                        startTime: startTime,
+                        endTime: endTime,
+                        type: type,
+                        spk: spk,
+                        reason: reason,
+                        approvalStatus: type === 'Lembur' ? 'Pending' : 'N/A',
+                        timestamp: Date.now()
+                    });
+                }
+                
+                window.showToast(`${rows.length} Item pekerjaan berhasil disimpan!`);
+                document.getElementById('form-task').reset();
+                document.getElementById('task-items-container').innerHTML = ''; 
+                window.addTaskRow(); 
+                window.toggleLembur();
+
+            } catch(err) {
+                console.error(err);
+                window.showToast("Terjadi kesalahan saat menyimpan ke Cloud.", true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Simpan Semua Pekerjaan';
+            }
+        };
+
+
+        // --- Navigation Login & Tabs ---
+        window.handleKaryawanLogin = (e) => {
+            e.preventDefault();
+            const n = document.getElementById('input-karyawan-name').value.trim();
+            if(n) {
+                window.currentUser = n;
+                window.currentRole = 'karyawan';
+                document.getElementById('display-k-name').innerText = n;
+                window.showView('view-karyawan-portal');
+                window.switchKaryawanTab('absen');
+            }
+        };
+
+        window.handleManagementLogin = (e) => {
+            e.preventDefault();
+            if(document.getElementById('input-management-pin').value !== '123456') {
+                return window.showToast("PIN Salah!", true);
+            }
+            window.currentRole = 'management';
+            window.showView('view-management-portal');
+            window.switchTab('dash');
+        };
+
+        window.switchKaryawanTab = (tab) => {
+            const btns = { absen: document.getElementById('ktab-btn-absen'), tugas: document.getElementById('ktab-btn-tugas') };
+            const divs = { absen: document.getElementById('ktab-content-absen'), tugas: document.getElementById('ktab-content-tugas') };
+            
+            Object.keys(btns).forEach(k => {
+                if(k === tab) {
+                    btns[k].className = 'px-3 py-1.5 rounded-md bg-white text-blue-700 font-bold shadow-sm transition';
+                    divs[k].classList.replace('hidden', 'block');
+                } else {
+                    btns[k].className = 'px-3 py-1.5 rounded-md text-blue-100 hover:text-white transition';
+                    divs[k].classList.replace('block', 'hidden');
+                }
+            });
+        };
+
+        window.toggleLembur = () => {
+            const isLembur = document.getElementById('k-type').value === 'Lembur';
+            document.getElementById('k-lembur-fields').classList.toggle('hidden', !isLembur);
+            document.getElementById('k-spk').required = isLembur;
+            document.getElementById('k-reason').required = isLembur;
+        };
+
+        window.switchTab = (tab) => {
+            window.activeTab = tab;
+            ['dash', 'absen', 'approval', 'all'].forEach(id => {
+                document.getElementById(`tab-content-${id}`).classList.add('hidden');
+                document.getElementById(`tab-content-${id}`).classList.remove('block');
+                const btn = document.getElementById(`mtab-btn-${id}`);
+                btn.classList.replace('border-amber-500', 'border-transparent');
+                btn.classList.replace('text-amber-600', 'text-slate-500');
+                btn.classList.remove('font-bold');
+            });
+            document.getElementById(`tab-content-${tab}`).classList.remove('hidden');
+            document.getElementById(`tab-content-${tab}`).classList.add('block');
+            
+            const aBtn = document.getElementById(`mtab-btn-${tab}`);
+            aBtn.classList.replace('border-transparent', 'border-amber-500');
+            aBtn.classList.replace('text-slate-500', 'text-amber-600');
+            aBtn.classList.add('font-bold');
+            
+            document.getElementById('print-footer').style.display = (tab === 'all' || tab === 'absen') ? 'block' : 'none';
+            window.updateManagementUI();
+        };
+
+        // --- Management Renders ---
+        window.updateManagementUI = () => {
+            if(window.activeTab === 'dash') renderDashboard();
+            if(window.activeTab === 'absen') window.renderAbsenHarian();
+            if(window.activeTab === 'approval') renderApproval();
+            if(window.activeTab === 'all') renderAllTasks();
+        };
+
+        const renderDashboard = () => {
+            const tasks = window.tasks || [];
+            const absen = window.attendances || [];
+            
+            document.getElementById('stat-total').innerText = tasks.length;
+            const todayISO = new Date().toISOString().split('T')[0];
+            document.getElementById('stat-absen').innerText = absen.filter(a => a.dateStr === todayISO).length;
+
+            let s=0, p=0, t=0, r=0, l=0;
+            tasks.forEach(tsk => {
+                if(tsk.taskStatus === 'Selesai') s++; else if(tsk.taskStatus === 'Tertunda') t++; else p++;
+                if(tsk.type === 'Lembur') l++; else r++;
+            });
+            document.getElementById('stat-selesai').innerText = s;
+            document.getElementById('stat-lembur').innerText = l;
+
+            const ctxS = document.getElementById('chart-status').getContext('2d');
+            if(statusChart) statusChart.destroy();
+            statusChart = new Chart(ctxS, {
+                type: 'doughnut',
+                data: { labels: ['Selesai', 'Proses', 'Tertunda'], datasets: [{ data: [s, p, t], backgroundColor: ['#10b981', '#3b82f6', '#cbd5e1'] }] },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            });
+
+            const ctxT = document.getElementById('chart-type').getContext('2d');
+            if(typeChart) typeChart.destroy();
+            typeChart = new Chart(ctxT, {
+                type: 'bar',
+                data: { labels: ['Tipe'], datasets: [{ label: 'Reguler', data: [r], backgroundColor: '#3b82f6'}, { label: 'Lembur', data: [l], backgroundColor: '#f59e0b'}] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        };
+
+        window.renderAbsenHarian = () => {
+            const filterDate = document.getElementById('filter-date-absen').value;
+            const tbody = document.getElementById('tbody-absen-harian');
+            
+            if(!filterDate) return tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center">Pilih tanggal terlebih dahulu</td></tr>`;
+            
+            const filtered = (window.attendances || []).filter(a => a.dateStr === filterDate).sort((a,b) => b.timestamp - a.timestamp);
+            
+            if(filtered.length === 0) {
+                return tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-500">Tidak ada data absen untuk tanggal ini.</td></tr>`;
+            }
+
+            tbody.innerHTML = filtered.map((a, idx) => `
+                <tr class="hover:bg-blue-50/50 transition">
+                    <td class="p-4">${idx + 1}</td>
+                    <td class="p-4 font-bold text-slate-800">${a.name}</td>
+                    <td class="p-4 font-medium text-slate-600"><i class="far fa-clock mr-1 text-slate-400"></i>${a.timeStr}</td>
+                    <td class="p-4">
+                        ${a.photoUrl === "TANPA_FOTO" 
+                            ? `<span class="bg-rose-100 text-rose-700 px-2 py-1 rounded text-xs font-bold border border-rose-200"><i class="fas fa-exclamation-triangle mr-1"></i> Tanpa Foto</span>` 
+                            : `<div class="w-12 h-12 rounded border bg-slate-200 overflow-hidden"><img src="${a.photoUrl}" class="w-full h-full object-cover"></div>`
+                        }
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        const renderApproval = () => {
+            const tbody = document.getElementById('tbody-approval');
+            const pending = (window.tasks||[]).filter(t => t.type === 'Lembur' && t.approvalStatus === 'Pending');
+            
+            if(!pending.length) return tbody.innerHTML = `<tr><td colspan="4" class="p-8 text-center text-slate-500">Tidak ada pengajuan lembur yang menunggu persetujuan.</td></tr>`;
+
+            tbody.innerHTML = pending.map(t => `
+                <tr class="hover:bg-amber-50/50 transition border-b border-slate-100">
+                    <td class="p-4 align-top">
+                        <div class="font-bold text-slate-800">${t.name}</div>
+                        <div class="text-xs text-slate-500 mt-1">${t.date} (${t.startTime}-${t.endTime})</div>
+                    </td>
+                    <td class="p-4 align-top">
+                        <div class="text-xs text-blue-600 font-bold mb-1">Project: ${t.projectName || '-'}</div>
+                        <div class="font-medium text-slate-800">${t.taskName}</div>
+                        <div class="text-xs text-slate-500">Qty: ${t.quantity} | ${t.taskStatus}</div>
+                    </td>
+                    <td class="p-4 align-top">
+                        <div class="text-xs font-bold text-amber-700 mb-1">SPK: ${t.spk}</div>
+                        <div class="text-xs text-slate-600">${t.reason}</div>
+                    </td>
+                    <td class="p-4 text-center align-top">
+                        <div class="flex flex-col gap-2">
+                            <button onclick="window.updateApproveStatus('${t.id}', 'Disetujui')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-1.5 rounded-lg shadow-sm text-xs font-bold transition">Setujui</button>
+                            <button onclick="window.updateApproveStatus('${t.id}', 'Ditolak')" class="bg-rose-500 hover:bg-rose-600 text-white px-3 py-1.5 rounded-lg shadow-sm text-xs font-bold transition">Tolak</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        const renderAllTasks = () => {
+            const tbody = document.getElementById('tbody-all');
+            const allT = (window.tasks||[]).sort((a,b) => b.timestamp - a.timestamp);
+            if(!allT.length) return tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-slate-500">Belum ada data tugas.</td></tr>`;
+
+            tbody.innerHTML = allT.map(t => `
+                <tr class="hover:bg-slate-50 transition border-b border-slate-100">
+                    <td class="p-4 text-xs font-medium text-slate-500">${t.date}</td>
+                    <td class="p-4 font-bold text-slate-800">${t.name}</td>
+                    <td class="p-4">
+                        <div class="text-xs text-blue-600 font-bold mb-1">Project: ${t.projectName || '-'}</div>
+                        <div class="font-medium text-slate-700">${t.taskName}</div>
+                        <div class="text-xs text-slate-500">Qty: ${t.quantity} | Status: ${t.taskStatus}</div>
+                    </td>
+                    <td class="p-4">
+                        <div class="text-xs font-medium">${t.startTime} - ${t.endTime}</div>
+                        <span class="inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${t.type === 'Lembur' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'}">${t.type} ${t.type === 'Lembur' ? '('+t.approvalStatus+')' : ''}</span>
+                    </td>
+                    <td class="p-4 text-center no-print">
+                        <div class="flex justify-center gap-2">
+                            <button onclick="window.openEditModal('${t.id}')" class="bg-slate-100 hover:bg-amber-100 text-slate-600 hover:text-amber-700 px-2 py-1.5 rounded-lg border border-slate-200 transition text-xs font-bold"><i class="fas fa-edit"></i></button>
+                            <button onclick="window.deleteTask('${t.id}')" class="bg-slate-100 hover:bg-rose-100 text-slate-600 hover:text-rose-700 px-2 py-1.5 rounded-lg border border-slate-200 transition text-xs font-bold"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        };
+
+        // --- Export CSV Logic ---
+        window.exportCSV = (type) => {
+            let csvContent = "data:text/csv;charset=utf-8,";
+            
+            if (type === 'absen') {
+                csvContent += "Tanggal,Waktu,Nama Karyawan,Status Absen\n";
+                const filterDate = document.getElementById('filter-date-absen').value;
+                let data = window.attendances || [];
+                // if a date is selected, download only that date. otherwise, all.
+                if(filterDate) {
+                    data = data.filter(a => a.dateStr === filterDate);
+                }
+                
+                if(data.length === 0) return window.showToast("Tidak ada data absen untuk diunduh.", true);
+
+                data.forEach(a => {
+                    const status = a.photoUrl === 'TANPA_FOTO' ? 'Manual (Tanpa Foto)' : 'Hadir (Dengan Foto)';
+                    csvContent += `"${a.dateStr}","${a.timeStr}","${a.name}","${status}"\n`;
+                });
+            } else if (type === 'tasks') {
+                csvContent += "Tanggal,Jam Mulai,Jam Selesai,Nama Karyawan,Nama Project,Nama Tugas,Quantity,Status,Tipe Jam,SPK,Alasan Lembur,Status Approval\n";
+                const data = window.tasks || [];
+                
+                if(data.length === 0) return window.showToast("Tidak ada data tugas untuk diunduh.", true);
+
+                data.forEach(t => {
+                    csvContent += `"${t.dateISO}","${t.startTime}","${t.endTime}","${t.name}","${t.projectName || '-'}","${t.taskName}","${t.quantity}","${t.taskStatus}","${t.type}","${t.spk || '-'}","${t.reason || '-'}","${t.approvalStatus}"\n`;
+                });
+            }
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            const dateSuffix = new Date().toISOString().split('T')[0];
+            link.setAttribute("download", `Rekap_${type}_GND_${dateSuffix}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        // --- Management Actions (Cloud) ---
+        window.openEditModal = (id) => {
+            const t = window.tasks.find(x => x.id === id);
+            if(!t) return;
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-project').value = t.projectName || '';
+            document.getElementById('edit-task').value = t.taskName;
+            document.getElementById('edit-qty').value = t.quantity;
+            document.getElementById('edit-status').value = t.taskStatus;
+            document.getElementById('edit-type').value = t.type;
+            document.getElementById('edit-approval').value = t.approvalStatus || 'N/A';
+            document.getElementById('edit-modal').classList.replace('hidden', 'flex');
+        };
+        window.closeEditModal = () => document.getElementById('edit-modal').classList.replace('flex', 'hidden');
+
+        window.saveEdit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            if(!db) return;
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'g9_tasks', id), {
+                    projectName: document.getElementById('edit-project').value,
+                    taskName: document.getElementById('edit-task').value,
+                    quantity: document.getElementById('edit-qty').value,
+                    taskStatus: document.getElementById('edit-status').value,
+                    type: document.getElementById('edit-type').value,
+                    approvalStatus: document.getElementById('edit-approval').value
+                });
+                window.showToast("Perubahan berhasil disimpan.");
+                window.closeEditModal();
+            } catch(e) { window.showToast("Gagal menyimpan ke Cloud.", true); }
+        };
+
+        window.updateApproveStatus = async (id, status) => {
+            if(!db) return;
+            try {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'g9_tasks', id), { approvalStatus: status });
+                window.showToast(`Lembur ${status}`);
+            } catch(e) { window.showToast("Gagal update status", true); }
+        };
+
+        window.deleteTask = (id) => {
+            window.openConfirm("Hapus Tugas", "Apakah Anda yakin ingin menghapus data tugas ini secara permanen?", async () => {
+                if(!db) return;
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'g9_tasks', id));
+                    window.showToast("Tugas berhasil dihapus.");
+                } catch(e) { window.showToast("Gagal menghapus data", true); }
+            });
+        };
+
+        // Init Flow
+        initSystem();
+
+    </script>
+</body>
+</html>
